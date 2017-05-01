@@ -25,12 +25,14 @@ EFI_PREFIX=/usr
 endif
 EFI_ARCH=x86_64
 EFI_INC          = ${EFI_PREFIX}/include/efi
-EFI_CRT_OBJS    = $(EFI_LIB)/crt0-efi-$(EFI_ARCH).o
-EFI_LDS         = $(EFI_LIB)/elf_$(EFI_ARCH)_efi.lds
-GCC_ARCH         = -m64
+
 ifeq ("${EFI_LIB}","")
 EFI_LIB          = ${EFI_PREFIX}/lib64/gnuefi
 endif
+
+EFI_CRT_OBJS    = $(EFI_LIB)/crt0-efi-$(EFI_ARCH).o
+EFI_LDS         = $(EFI_LIB)/elf_$(EFI_ARCH)_efi.lds
+GCC_ARCH         = -m64
 
 
 CPPFLAGS        = -I${BUILD_DIR} -I$(EFI_INC) -I$(EFI_INC)/$(EFI_ARCH) -I$(EFI_INC)/protocol \
@@ -44,7 +46,7 @@ CFLAGS          =  ${DEPFLAGS} ${GCC_ARCH} ${OPT} -fno-stack-protector -fpic \
 GCCLIB          =  $(shell $(CC) ${CFLAGS} ${CPPFLAGS} -print-libgcc-file-name)
 
 LDFLAGS         = -nostdlib -znocombreloc -T $(EFI_LDS) -shared \
-                  -Bsymbolic -L $(EFI_LIB) -L $(LIB)
+                  -Bsymbolic -L $(EFI_LIB) -L $(EFI_PREFIX)/lib64
 
 PAYLOAD_LIB=${BUILD_DIR}/payload.a
 
