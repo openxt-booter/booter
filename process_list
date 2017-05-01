@@ -1,0 +1,85 @@
+#!/bin/sh
+
+set -x
+
+count=0
+
+LIST=$1
+LIBRARY=$2
+H_FILE=$3
+
+
+AR=ar
+OBJCOPY=objcopy
+ELF_ARCH=i386:x86-64
+ELF_FORMAT=elf64-x86-64
+
+mkdir -p build
+
+rm -f ${LIBRARY} ${H_FILE} build/$$
+
+while read -r file args && [ ! -z "$file" ] ; do
+
+cfn="src/${file}"
+fn="build/${file}"
+
+rm -f "$fn"
+
+# we can't do .gz
+# tboot can't do .gz
+# hopefully xen can
+
+if [ $count -lt 2 ]; then
+	if ! gzip -d < "$cfn" > "$fn"; then
+		/bin/cp -f "$cfn" "$fn"
+	fi
+else 
+	/bin/cp -f "$cfn" "$fn"
+fi
+
+
+
+in_sym=$( echo /binary/${fn} | tr ' ./-' ____ )
+sym=$( echo payload/${file} | tr ' ./-' ____ )
+
+${OBJCOPY} -I binary -O ${ELF_FORMAT} -B ${ELF_ARCH} --redefine-sym ${in_sym}_start=${sym}_start --redefine-sym ${in_sym}_end=${sym}_end "${fn}" "build/${file}.o"
+
+${AR} rcs ${LIBRARY} "build/${file}.o"
+rm -f "build/${file}.o"
+
+echo "extern uint8_t ${sym}_start[], ${sym}_end[];" >> ${H_FILE}
+echo "  { \\" >> build/$$
+echo "    uint64_t len = ((size_t) ${sym}_end) - ((size_t) ${sym}_start); \\" >> build/$$
+echo "    b = (size_t) ${sym}_start; \\" >> build/$$
+echo "    /* memcpy((void *) b, ${sym}_start, len); */ \\" >> build/$$
+echo "	  p[${count}].mod_start = (uint32_t) b; \\" >>  build/$$
+echo "	  p[${count}].mod_end   = (uint32_t) (b + len) ; \\" >>  build/$$
+echo "	  /* b += len + 4095; */ \\" >>  build/$$
+echo "	  /* b &= ~(4095ULL); */ \\" >>  build/$$
+
+if [ -z "$args" ]; then
+echo "    p[${count}].cmdline   = 0; \\" >>  build/$$
+else
+echo "    p[${count}].cmdline   = (uint32_t) (size_t) (void *)  \"${args}\"; \\" >>  build/$$
+fi
+echo "    p[${count}].pad       = 0; \\" >>  build/$$
+echo "  } \\" >>  build/$$
+echo "\\" >>  build/$$
+
+count=$[ $count + 1]
+done < ${LIST}
+
+cat << EOF >> ${H_FILE}
+
+#define PAYLOAD_INIT(p,b) \\
+EOF
+
+cat build/$$ >> ${H_FILE}
+rm -f build/$$
+
+cat << EOF >> ${H_FILE}
+
+#define PAYLOAD_NUM $count
+
+EOF
+
