@@ -13,7 +13,7 @@ efi_main (EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 
   InitializeLib (image_handle, system_table);
 
-  serial_init (1);
+  //serial_init (1);
 
   Print (L"OpenXT EFI booter @ %llx\n", (unsigned long long) (size_t) efi_main);
 
